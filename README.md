@@ -5,10 +5,11 @@
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.28%2B-326CE5?logo=kubernetes)](https://kubernetes.io/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb)](https://www.mongodb.com/atlas)
 [![Datadog](https://img.shields.io/badge/Datadog-Monitoring-632CA6?logo=datadog)](https://www.datadoghq.com/)
+[![ArgoCD](https://img.shields.io/badge/ArgoCD-GitOps-EF4444?logo=argo)](https://argo-cd.readthedocs.io/)
 
-Enterprise-ready platform for running a microservices voting application on **Amazon EKS**, with full Infrastructure as Code, CI/CD, and managed data. The stack includes Terraform (AWS, EKS), Jenkins pipelines, Helm (NGINX Ingress), and **MongoDB Atlas** as the managed database.
+Enterprise-ready platform for running a microservices voting application on **Amazon EKS**, with full Infrastructure as Code, CI/CD, and managed data. The stack includes Terraform (AWS, EKS), Jenkins pipelines, **ArgoCD** for GitOps, Helm (NGINX Ingress), and **MongoDB Atlas** as the managed database.
 
-**Key technologies:** AWS EKS · Terraform · Jenkins · Helm · Kubernetes · NGINX Ingress · API Gateway · Cognito · **MongoDB Atlas** · **Datadog** (monitoring) · Redis · Flask · Node.js
+**Key technologies:** AWS EKS · Terraform · Jenkins · **ArgoCD** (GitOps) · Helm · Kubernetes · NGINX Ingress · API Gateway · Cognito · **MongoDB Atlas** · **Datadog** (monitoring) · Redis · Flask · Node.js
 
 ---
 
@@ -37,7 +38,7 @@ This repository provides everything needed to build, deploy, and operate the vot
 | Area | Description |
 |------|-------------|
 | **Infrastructure** | VPC, IAM, EKS cluster, node group, API Gateway, Cognito, and VPC Link — all defined in Terraform. |
-| **CI/CD** | Jenkins pipelines for Cluster, Ingress, application build/deploy, and Api-Cognito. |
+| **CI/CD** | Jenkins pipelines for Cluster, Ingress, application build/deploy, and Api-Cognito; **ArgoCD** for GitOps-based deployment and sync. |
 | **Platform** | NGINX Ingress Controller (Helm) on EKS; API Gateway with JWT auth at the edge. |
 | **Application** | Voting microservices (vote, result, worker) with Kubernetes manifests and source in `app/`. |
 | **Database** | **MongoDB Atlas** — managed database. You must create a Kubernetes Secret in the cluster with your Atlas connection URL (see [Secrets and Registry](#secrets-and-registry)). No secret file is committed in this repo. |
@@ -271,11 +272,11 @@ cd ../Cluster && terraform destroy
 
 | Reference     | Description |
 |---------------|-------------|
-| This README   | Architecture, structure, pipelines, quick start, operations, security, **MongoDB Atlas** secret (create in cluster), **Datadog** monitoring. |
+| This README   | Architecture, structure, pipelines, **ArgoCD** (GitOps), quick start, operations, security, **MongoDB Atlas** secret (create in cluster), **Datadog** monitoring. |
 | `Cluster/`    | Variables: `region`, `environment`, `vpc_cidr`. Outputs: `vpc_id`, `private_subnets`, `public_subnets`, `cluster_name`, `cluster_endpoint`, `cluster_ca_certificate`. |
 | `Ingress/`    | Variables: `nginx_namespace`, `replica_count`, `service_type`, `aws_lb_type`, `aws_lb_internal`. Outputs: `nginx_ingress_lb_hostname`, `nginx_ingress_namespace`. |
 | `Api-Cognito/`| Variables: `region`, `vpc_id`, `subnet_ids`, `project_name`, `environment`. Outputs: `api_endpoint`, `user_pool_id`, `app_client_id`, `cognito_domain`, `vpc_link_id`. |
-| State backend | S3 and DynamoDB: `Cluster/backend.tf`, `Ingress/backend.tf`. |
+| `State backend` | S3 and DynamoDB: `Cluster/backend.tf`, `Ingress/backend.tf`. |
 
 ---
 
