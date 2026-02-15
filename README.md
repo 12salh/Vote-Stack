@@ -5,7 +5,7 @@
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.28%2B-326CE5?logo=kubernetes)](https://kubernetes.io/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb)](https://www.mongodb.com/atlas)
 [![Datadog](https://img.shields.io/badge/Datadog-Monitoring-632CA6?logo=datadog)](https://www.datadoghq.com/)
-[![ArgoCD](https://img.shields.io/badge/ArgoCD-GitOps-EF4444?logo=argo)](https://argo-cd.readthedocs.io/)
+[![ArgoCD](https://img.shields.io/badge/ArgoCD-GitOps-EF4444?logo=argo)](https://argo-cd.readthedocs.io/) 
 
 Enterprise-ready platform for running a microservices voting application on **Amazon EKS**, with full Infrastructure as Code, CI/CD, and managed data. The stack includes Terraform (AWS, EKS), Jenkins pipelines, **ArgoCD** for GitOps, Helm (NGINX Ingress), and **MongoDB Atlas** as the managed database.
 
