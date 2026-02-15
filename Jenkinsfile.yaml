@@ -1,0 +1,100 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ACTION',
+            choices: ['apply', 'destroy'],
+            description: 'Terraform Action'
+        )
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+        TF_STATE_BUCKET   = 'nti-terraform-statees'
+        TF_STATE_KEY      = 'eks/nonprod/terraform.tfstate'
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git(
+                    url: 'https://github.com/12salh/EKS-Cluster-Terraform.git',
+                    branch: 'main'
+                )
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws_cred'
+                ]]) {
+                    dir('Cluster') {
+                        sh '''
+                          terraform init \
+                            -backend-config="bucket=${TF_STATE_BUCKET}" \
+                            -backend-config="key=${TF_STATE_KEY}" \
+                            -backend-config="region=${AWS_DEFAULT_REGION}"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Validate') {
+            steps {
+                dir('Cluster') {
+                    sh 'terraform validate'
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws_cred'
+                ]]) {
+                    dir('Cluster') {
+                        sh 'terraform plan -out=tfplan'
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws_cred'
+                ]]) {
+                    dir('Cluster') {
+                        sh 'terraform apply -auto-approve tfplan'
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Destroy') {
+            when {
+                expression { params.ACTION == 'destroy' }
+            }
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws_cred'
+                ]]) {
+                    dir('Cluster') {
+                        sh 'terraform destroy -auto-approve'
+                    }
+                }
+            }
+        }
+    }
+}

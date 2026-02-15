@@ -1,0 +1,228 @@
+pipeline {
+  agent any
+
+  parameters {
+    choice(
+      name: 'ACTION',
+      choices: ['apply', 'destroy'],
+      description: 'Terraform Action'
+    )
+  }
+
+  environment {
+    AWS_DEFAULT_REGION = 'us-east-1'
+    CLUSTER_NAME       = 'nti-nonprod-eks'
+
+    TF_STATE_BUCKET = 'nti-terraform-statees-1'
+    TF_STATE_KEY    = 'eks/nonprod/terraform.tfstate'
+
+    KUBECONFIG_PATH = "${env.WORKSPACE}/kubeconfig"
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Terraform Init') {
+      when { expression { params.ACTION == 'apply' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          dir('Ingress') {
+            sh '''
+              set -eux
+              terraform init -reconfigure \
+                -backend-config="bucket=${TF_STATE_BUCKET}" \
+                -backend-config="key=${TF_STATE_KEY}" \
+                -backend-config="region=${AWS_DEFAULT_REGION}"
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Terraform Plan') {
+      when { expression { params.ACTION == 'apply' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          dir('Ingress') {
+            sh '''
+              set -eux
+              terraform plan -out=tfplan
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Terraform Apply') {
+      when { expression { params.ACTION == 'apply' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          dir('Ingress') {
+            sh '''
+              set -eux
+              terraform apply -auto-approve tfplan
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Configure kubeconfig') {
+      when { expression { params.ACTION == 'apply' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          sh '''
+            set -eux
+            aws eks update-kubeconfig \
+              --region "${AWS_DEFAULT_REGION}" \
+              --name "${CLUSTER_NAME}" \
+              --kubeconfig "${KUBECONFIG_PATH}"
+
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" get nodes
+          '''
+        }
+      }
+    }
+
+    stage('Install Argo CD (Helm)') {
+      when { expression { params.ACTION == 'apply' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          sh '''
+            set -eux
+
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace argocd \
+              --dry-run=client -o yaml --validate=false \
+            | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
+
+            helm repo add argo https://argoproj.github.io/argo-helm
+            helm repo update
+
+            helm upgrade --install argocd argo/argo-cd \
+              --namespace argocd \
+              --create-namespace \
+              --wait \
+              --kubeconfig "${KUBECONFIG_PATH}" \
+              --set configs.params.server.insecure=true \
+              --set configs.params.server.basehref=/argo \
+              --set configs.params.server.rootpath=/argo \
+              --set server.ingress.enabled=true \
+              --set server.ingress.ingressClassName=nginx \
+              --set server.ingress.annotations."nginx\\.ingress\\.kubernetes\\.io/backend-protocol"=HTTP \
+              --set server.ingress.annotations."nginx\\.ingress\\.kubernetes\\.io/ssl-redirect"=false \
+              --set server.ingress.paths[0].path=/argo \
+              --set server.ingress.paths[0].pathType=Prefix
+
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" -n argocd get pods
+          '''
+        }
+      }
+    }
+
+    stage('Install Datadog Agent') {
+      when { expression { params.ACTION == 'apply' } }
+      steps {
+        withCredentials([string(credentialsId: 'datadog', variable: 'DD_API_KEY')]) {
+          sh '''
+            set -eux
+
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" create namespace datadog \
+              --dry-run=client -o yaml --validate=false \
+            | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
+
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" create secret generic datadog-secret \
+              --from-literal=api-key=$DD_API_KEY \
+              -n datadog \
+              --dry-run=client -o yaml --validate=false \
+            | kubectl --kubeconfig "${KUBECONFIG_PATH}" apply -f -
+
+            helm repo add datadog https://helm.datadoghq.com
+            helm repo update
+
+            cat <<EOF > datadog-values.yaml
+datadog:
+  site: "datadoghq.com"
+  clusterName: "${CLUSTER_NAME}"
+  apiKeyExistingSecret: "datadog-secret"
+  clusterChecks:
+    enabled: true
+  orchestratorExplorer:
+    enabled: true
+EOF
+
+            helm upgrade --install datadog-agent datadog/datadog \
+              -f datadog-values.yaml \
+              -n datadog \
+              --kubeconfig "${KUBECONFIG_PATH}"
+
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" -n datadog get pods
+          '''
+        }
+      }
+    }
+
+    stage('Uninstall Datadog Agent') {
+      when { expression { params.ACTION == 'destroy' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          sh '''
+            set -eux
+            aws eks update-kubeconfig \
+              --region "${AWS_DEFAULT_REGION}" \
+              --name "${CLUSTER_NAME}" \
+              --kubeconfig "${KUBECONFIG_PATH}"
+
+            helm uninstall datadog-agent -n datadog --kubeconfig "${KUBECONFIG_PATH}" || true
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" delete namespace datadog --wait=false || true
+          '''
+        }
+      }
+    }
+
+    stage('Uninstall Argo CD') {
+      when { expression { params.ACTION == 'destroy' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          sh '''
+            set -eux
+            aws eks update-kubeconfig \
+              --region "${AWS_DEFAULT_REGION}" \
+              --name "${CLUSTER_NAME}" \
+              --kubeconfig "${KUBECONFIG_PATH}"
+
+            helm uninstall argocd -n argocd --kubeconfig "${KUBECONFIG_PATH}" || true
+            kubectl --kubeconfig "${KUBECONFIG_PATH}" delete namespace argocd --wait=false || true
+          '''
+        }
+      }
+    }
+
+    stage('Terraform Destroy') {
+      when { expression { params.ACTION == 'destroy' } }
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_cred']]) {
+          dir('Ingress') {
+            sh '''
+              set -eux
+              terraform destroy -auto-approve
+            '''
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo 'Pipeline finished successfully.'
+    }
+    failure {
+      echo 'Pipeline failed.'
+    }
+  }
+}

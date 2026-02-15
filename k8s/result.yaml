@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: result
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: result
+  template:
+    metadata:
+      labels:
+        app: result
+    spec:
+      containers:
+      - name: result
+        image: mohamedsaleh33/result:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        env:
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: MONGO_URI
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: result
+spec:
+  selector:
+    app: result
+  ports:
+  - port: 80
+    targetPort: 80

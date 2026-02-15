@@ -1,0 +1,90 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ACTION',
+            choices: ['apply', 'destroy'],
+            description: 'Terraform Action for Api-Cognito'
+        )
+    }
+
+    environment {
+        AWS_REGION      = 'us-east-1'
+        AWS_CREDENTIALS = 'aws_cred'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: AWS_CREDENTIALS]]) {
+                    dir('Api-Cognito') {
+                        sh '''
+                          set -euxo pipefail
+                          terraform init
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            when { expression { params.ACTION == 'apply' } }
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: AWS_CREDENTIALS]]) {
+                    dir('Api-Cognito') {
+                        sh '''
+                          set -euxo pipefail
+                          terraform plan
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when { expression { params.ACTION == 'apply' } }
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: AWS_CREDENTIALS]]) {
+                    dir('Api-Cognito') {
+                        sh '''
+                          set -euxo pipefail
+                          terraform apply -auto-approve
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Destroy') {
+            when { expression { params.ACTION == 'destroy' } }
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: AWS_CREDENTIALS]]) {
+                    dir('Api-Cognito') {
+                        sh '''
+                          set -euxo pipefail
+                          terraform destroy -auto-approve
+                        '''
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo "Pipeline ${params.ACTION} completed successfully ✅"
+        }
+        failure {
+            echo "Pipeline failed ❌"
+        }
+    }
+}
