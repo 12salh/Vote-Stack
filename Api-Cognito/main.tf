@@ -99,7 +99,7 @@ resource "aws_apigatewayv2_vpc_link" "this" {
 # Integration with NLB
 # ------------------------
 data "aws_lb" "nlb" {
-  name = "a3bc4ba12a00348ef8bc230ff6cdb7ef"  
+  name = "a3992f43b3de34fd384cb31472ae2008"  
 }
 
 data "aws_lb_listener" "http" {
