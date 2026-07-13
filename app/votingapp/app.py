@@ -1,9 +1,13 @@
-# from flask import Flask, render_template_string, request
+# from flask import Flask, render_template_string, request, make_response
 # import redis
 # import os
+# import uuid
+
 
 # app = Flask(__name__)
 
+
+# # Redis Configuration
 # redis_host = os.getenv("REDIS_HOST", "redis")
 
 # r = redis.Redis(
@@ -13,34 +17,40 @@
 # )
 
 
+
 # HTML = """
 
 # <!DOCTYPE html>
+
 # <html lang="en">
 
 # <head>
 
 # <meta charset="UTF-8">
+
 # <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-# <title>Voting System</title>
+# <title>Animal Voting System</title>
 
 
 # <style>
+
 
 # *{
 #     margin:0;
 #     padding:0;
 #     box-sizing:border-box;
-#     font-family:Arial, sans-serif;
+#     font-family:'Segoe UI',sans-serif;
 # }
+
 
 
 # body{
 
 #     min-height:100vh;
 
-#     background:linear-gradient(135deg,#111827,#2563eb);
+#     background:
+#     linear-gradient(135deg,#0f172a,#2563eb);
 
 #     display:flex;
 
@@ -53,6 +63,7 @@
 # }
 
 
+
 # .container{
 
 #     width:700px;
@@ -63,7 +74,7 @@
 
 #     text-align:center;
 
-#     background:rgba(255,255,255,.1);
+#     background:rgba(255,255,255,0.12);
 
 #     backdrop-filter:blur(15px);
 
@@ -77,11 +88,12 @@
 
 # h1{
 
-#     font-size:50px;
+#     font-size:45px;
 
-#     margin-bottom:15px;
+#     margin-bottom:20px;
 
 # }
+
 
 
 # .subtitle{
@@ -120,11 +132,11 @@
 
 #     border-radius:20px;
 
+#     color:white;
+
 #     font-size:30px;
 
 #     cursor:pointer;
-
-#     color:white;
 
 #     transition:.3s;
 
@@ -156,15 +168,33 @@
 
 
 
-# .info{
+# .success{
 
-#     margin-top:40px;
+#     margin-top:30px;
 
-#     padding:15px;
+#     padding:20px;
 
 #     background:#16a34a;
 
-#     border-radius:30px;
+#     border-radius:20px;
+
+#     font-size:22px;
+
+# }
+
+
+
+# .warning{
+
+#     margin-top:30px;
+
+#     padding:20px;
+
+#     background:#dc2626;
+
+#     border-radius:20px;
+
+#     font-size:22px;
 
 # }
 
@@ -172,14 +202,13 @@
 
 # .footer{
 
-#     margin-top:30px;
+#     margin-top:35px;
 
 #     color:#cbd5e1;
 
 #     font-size:14px;
 
 # }
-
 
 
 # </style>
@@ -191,11 +220,12 @@
 # <body>
 
 
+
 # <div class="container">
 
 
 # <h1>
-# 🐾 Voting System
+# 🐾 Animal Voting System
 # </h1>
 
 
@@ -205,13 +235,33 @@
 
 
 
+# {% if voted %}
+
+
+# <div class="warning">
+
+# ❌ You already voted!
+
+# <br><br>
+
+# Your vote has already been recorded.
+
+# </div>
+
+
+
+# {% else %}
+
+
+
 # <form method="POST">
 
 
 # <div class="buttons">
 
 
-# <button class="cats"
+# <button 
+# class="cats"
 # name="vote"
 # value="cats">
 
@@ -221,7 +271,8 @@
 
 
 
-# <button class="dogs"
+# <button
+# class="dogs"
 # name="vote"
 # value="dogs">
 
@@ -237,11 +288,8 @@
 
 
 
-# <div class="info">
+# {% endif %}
 
-# 🟢 Redis Connected | Voting Service Running
-
-# </div>
 
 
 # <div class="footer">
@@ -263,45 +311,129 @@
 # """
 
 
-# @app.route("/", methods=["GET", "POST"])
+
+# @app.route("/", methods=["GET","POST"])
 # def vote():
 
-#     if request.method == "POST":
 
-#         r.lpush(
-#             "votes",
-#             request.form["vote"]
+#     voter_id = request.cookies.get("voter_id")
+
+
+#     # Check if this browser already voted
+#     if voter_id and r.exists(f"voter:{voter_id}"):
+
+#         return render_template_string(
+#             HTML,
+#             voted=True
 #         )
 
 
-#     return render_template_string(HTML)
+
+#     # New vote
+#     if request.method == "POST":
+
+
+#         selected_vote = request.form.get("vote")
+
+
+#         if selected_vote not in ["cats","dogs"]:
+
+#             return "Invalid Vote"
 
 
 
-# if __name__ == "__main__":
+#         # Create unique voter ID
 
-#     app.run(
-#         host="0.0.0.0",
-#         port=80
+#         voter_id = str(uuid.uuid4())
+
+
+
+#         # Store vote count list
+
+#         r.lpush(
+#             "votes",
+#             selected_vote
+#         )
+
+
+
+#         # Store this user vote
+
+#         r.set(
+#             f"voter:{voter_id}",
+#             selected_vote
+#         )
+
+
+
+#         response = make_response(
+
+#             render_template_string(
+#                 HTML,
+#                 voted=True
+#             )
+
+#         )
+
+
+
+#         # Save cookie
+
+#         response.set_cookie(
+
+#             "voter_id",
+
+#             voter_id,
+
+#             max_age=60*60*24*365
+
+#         )
+
+
+
+#         return response
+
+
+
+#     return render_template_string(
+
+#         HTML,
+
+#         voted=False
+
 #     )
 
 
 
 
-from flask import Flask, render_template_string, request, make_response
+
+# if __name__ == "__main__":
+
+
+#     app.run(
+
+#         host="0.0.0.0",
+
+#         port=80
+
+#     )
+
+
+
+from flask import Flask, render_template_string, request
 import redis
 import os
-import uuid
+from datetime import datetime
 
 
 app = Flask(__name__)
 
 
-# Redis Configuration
-redis_host = os.getenv("REDIS_HOST", "redis")
+# Redis connection
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 
-r = redis.Redis(
-    host=redis_host,
+redis_client = redis.Redis(
+    host=REDIS_HOST,
     port=6379,
     decode_responses=True
 )
@@ -311,36 +443,26 @@ r = redis.Redis(
 HTML = """
 
 <!DOCTYPE html>
-
-<html lang="en">
+<html>
 
 <head>
 
-<meta charset="UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Animal Voting System</title>
+<title>DevOps Voting System</title>
 
 
 <style>
-
 
 *{
     margin:0;
     padding:0;
     box-sizing:border-box;
-    font-family:'Segoe UI',sans-serif;
+    font-family:Arial,sans-serif;
 }
-
 
 
 body{
 
-    min-height:100vh;
-
-    background:
-    linear-gradient(135deg,#0f172a,#2563eb);
+    height:100vh;
 
     display:flex;
 
@@ -348,19 +470,19 @@ body{
 
     align-items:center;
 
+    background:
+    linear-gradient(135deg,#020617,#1d4ed8);
+
     color:white;
 
 }
 
 
-
 .container{
 
-    width:700px;
+    width:600px;
 
-    max-width:90%;
-
-    padding:45px;
+    padding:40px;
 
     text-align:center;
 
@@ -370,7 +492,7 @@ body{
 
     border-radius:25px;
 
-    box-shadow:0 25px 60px rgba(0,0,0,.5);
+    box-shadow:0 20px 50px black;
 
 }
 
@@ -378,7 +500,7 @@ body{
 
 h1{
 
-    font-size:45px;
+    font-size:42px;
 
     margin-bottom:20px;
 
@@ -386,13 +508,11 @@ h1{
 
 
 
-.subtitle{
+p{
 
     color:#cbd5e1;
 
-    font-size:20px;
-
-    margin-bottom:40px;
+    margin-bottom:35px;
 
 }
 
@@ -404,9 +524,7 @@ h1{
 
     justify-content:center;
 
-    gap:30px;
-
-    flex-wrap:wrap;
+    gap:25px;
 
 }
 
@@ -414,19 +532,19 @@ h1{
 
 button{
 
-    width:220px;
+    width:200px;
 
-    height:100px;
+    height:90px;
 
     border:none;
 
     border-radius:20px;
 
-    color:white;
-
-    font-size:30px;
+    font-size:28px;
 
     cursor:pointer;
+
+    color:white;
 
     transition:.3s;
 
@@ -442,7 +560,7 @@ button:hover{
 
 
 
-.cats{
+.cat{
 
     background:#f97316;
 
@@ -450,7 +568,7 @@ button:hover{
 
 
 
-.dogs{
+.dog{
 
     background:#22c55e;
 
@@ -460,31 +578,27 @@ button:hover{
 
 .success{
 
-    margin-top:30px;
+    background:#16a34a;
 
     padding:20px;
 
-    background:#16a34a;
+    border-radius:15px;
 
-    border-radius:20px;
-
-    font-size:22px;
+    font-size:20px;
 
 }
 
 
 
-.warning{
-
-    margin-top:30px;
-
-    padding:20px;
+.error{
 
     background:#dc2626;
 
-    border-radius:20px;
+    padding:20px;
 
-    font-size:22px;
+    border-radius:15px;
+
+    font-size:20px;
 
 }
 
@@ -492,9 +606,9 @@ button:hover{
 
 .footer{
 
-    margin-top:35px;
+    margin-top:30px;
 
-    color:#cbd5e1;
+    color:#94a3b8;
 
     font-size:14px;
 
@@ -507,41 +621,32 @@ button:hover{
 </head>
 
 
-<body>
 
+<body>
 
 
 <div class="container">
 
 
 <h1>
-🐾 Animal Voting System
+🐾 Voting System
 </h1>
 
 
-<p class="subtitle">
+<p>
 Choose your favorite animal
 </p>
 
 
 
-{% if voted %}
+{% if message %}
 
-
-<div class="warning">
-
-❌ You already voted!
-
-<br><br>
-
-Your vote has already been recorded.
-
+<div class="{{status}}">
+{{message}}
 </div>
 
 
-
 {% else %}
-
 
 
 <form method="POST">
@@ -550,8 +655,7 @@ Your vote has already been recorded.
 <div class="buttons">
 
 
-<button 
-class="cats"
+<button class="cat"
 name="vote"
 value="cats">
 
@@ -560,9 +664,7 @@ value="cats">
 </button>
 
 
-
-<button
-class="dogs"
+<button class="dog"
 name="vote"
 value="dogs">
 
@@ -577,17 +679,15 @@ value="dogs">
 </form>
 
 
-
 {% endif %}
 
 
 
 <div class="footer">
 
-Powered by Flask + Redis + Kubernetes
+Flask + Redis + Kubernetes
 
 </div>
-
 
 
 </div>
@@ -595,10 +695,28 @@ Powered by Flask + Redis + Kubernetes
 
 </body>
 
-
 </html>
 
 """
+
+
+
+def get_user_ip():
+
+    """
+    Get real client IP behind Load Balancer
+    """
+
+    if request.headers.get("X-Forwarded-For"):
+
+        return request.headers.get(
+            "X-Forwarded-For"
+        ).split(",")[0]
+
+
+    return request.remote_addr
+
+
 
 
 
@@ -606,82 +724,94 @@ Powered by Flask + Redis + Kubernetes
 def vote():
 
 
-    voter_id = request.cookies.get("voter_id")
+    user_ip = get_user_ip()
 
 
-    # Check if this browser already voted
-    if voter_id and r.exists(f"voter:{voter_id}"):
+    voter_key = f"voter:{user_ip}"
+
+
+
+    # Check previous vote
+
+    old_vote = redis_client.get(
+        voter_key
+    )
+
+
+    if old_vote:
+
 
         return render_template_string(
             HTML,
-            voted=True
+            message=f"❌ You already voted ({old_vote})",
+            status="error"
         )
 
 
 
-    # New vote
     if request.method == "POST":
 
 
-        selected_vote = request.form.get("vote")
-
-
-        if selected_vote not in ["cats","dogs"]:
-
-            return "Invalid Vote"
+        selected_vote = request.form.get(
+            "vote"
+        )
 
 
 
-        # Create unique voter ID
+        if selected_vote not in [
+            "cats",
+            "dogs"
+        ]:
 
-        voter_id = str(uuid.uuid4())
+
+            return "Invalid vote"
 
 
 
-        # Store vote count list
+        # Save vote
 
-        r.lpush(
+        redis_client.lpush(
             "votes",
             selected_vote
         )
 
 
 
-        # Store this user vote
+        # Save user
 
-        r.set(
-            f"voter:{voter_id}",
+        redis_client.set(
+            voter_key,
             selected_vote
         )
 
 
+        # Store voting time
 
-        response = make_response(
+        redis_client.hset(
 
-            render_template_string(
-                HTML,
-                voted=True
-            )
+            f"vote_info:{user_ip}",
 
-        )
+            mapping={
 
+                "vote": selected_vote,
 
+                "time": str(datetime.now())
 
-        # Save cookie
-
-        response.set_cookie(
-
-            "voter_id",
-
-            voter_id,
-
-            max_age=60*60*24*365
+            }
 
         )
 
 
 
-        return response
+        return render_template_string(
+
+            HTML,
+
+            message="✅ Your vote has been recorded!",
+
+            status="success"
+
+        )
 
 
 
@@ -689,21 +819,18 @@ def vote():
 
         HTML,
 
-        voted=False
+        message=None,
+
+        status=None
 
     )
 
 
 
 
-
 if __name__ == "__main__":
 
-
     app.run(
-
         host="0.0.0.0",
-
         port=80
-
     )
