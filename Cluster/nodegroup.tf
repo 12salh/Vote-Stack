@@ -46,5 +46,5 @@ resource "aws_eks_node_group" "this" {
     max_size     = 6
   }
 
-  instance_types = ["t3.micro"]
+  instance_types = ["m7i-flex.large"]
 }
