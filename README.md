@@ -289,6 +289,6 @@ DevOps / Cloud Engineer with experience in building and operating cloud-native p
 |--|--|
 | **Role** | DevOps Engineer / Cloud Engineer |
 | **LinkedIn** | [www.linkedin.com/in/mo0hamed-saleh] |
-| **Email** | [engsaleh862@gmail.com] |
+| **Email** | [mohamedsalehpersonal901@gmail.com] |
 
 *For internal or organizational use. Ensure compliance with AWS, HashiCorp, MongoDB Atlas, and Datadog terms of use.*
